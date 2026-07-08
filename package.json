@@ -1,0 +1,24 @@
+{
+  "name": "@oasisomniverse/vue",
+  "version": "1.0.0",
+  "description": "OASIS Omniverse Vue 3 UI components",
+  "keywords": ["oasis", "omniverse", "vue", "vue3", "components"],
+  "author": "NextGenSoftware",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NextGenSoftwareUK/OASIS-Vue-UI-Component-Library.git"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./components/*": "./src/components/*.vue"
+  },
+  "files": ["src"],
+  "peerDependencies": {
+    "vue": ">=3.0.0",
+    "@oasisomniverse/web4-api": ">=2.0.0"
+  },
+  "scripts": {}
+}
