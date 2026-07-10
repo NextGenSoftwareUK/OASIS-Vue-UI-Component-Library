@@ -13,19 +13,7 @@ npm install @oasisomniverse/vue
 
 ## Basic Usage
 
-Register globally in `main.js`:
-
-```js
-import { createApp } from 'vue';
-import OasisVue from '@oasisomniverse/vue';
-import App from './App.vue';
-
-const app = createApp(App);
-app.use(OasisVue, { apiUrl: 'https://api.web4.oasisomniverse.one' });
-app.mount('#app');
-```
-
-Or import components individually:
+Import components directly — no plugin registration needed:
 
 ```vue
 <script setup>
@@ -33,13 +21,13 @@ import { Login, AvatarConnect, KarmaToast } from '@oasisomniverse/vue';
 </script>
 
 <template>
-  <Login @success="handleLogin" />
-  <AvatarConnect @login="handleLogin" @logout="handleLogout" />
-  <KarmaToast message="Quest completed" :amount="150" />
+  <AvatarConnect />
+  <KarmaToast />
+  <Login @loggedIn="handleLogin" @switchTo="view = $event" />
 </template>
 ```
 
-All components use the `apiUrl` passed to `app.use()`. Override per-component with `:apiUrl="'https://custom.api'"`.
+Session state and API configuration are managed by the internal `useOasis()` composable, shared across all components automatically.
 
 ---
 
@@ -49,23 +37,19 @@ All components use the `apiUrl` passed to `app.use()`. Override per-component wi
 
 #### `<Login>`
 
-Avatar login popup/form.
+Avatar login form. Emits navigation events to coordinate with your own auth flow.
 
 ```vue
 <Login
-  @success="handleLogin"
-  @close="handleClose"
+  @loggedIn="handleLogin"
+  @switchTo="view = $event"
 />
 ```
 
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `apiUrl` | `string` | from plugin install | OASIS API base URL override |
-
 | Event | Payload | Description |
 |---|---|---|
-| `success` | `{ avatarId, username, karma }` | Emitted on successful login |
-| `close` | — | Emitted when the popup is dismissed |
+| `loggedIn` | — | Emitted on successful login |
+| `switchTo` | `'signup' \| 'forgot'` | Emitted when the user clicks Sign Up or Forgot Password |
 
 ---
 
@@ -74,124 +58,75 @@ Avatar login popup/form.
 New avatar registration form.
 
 ```vue
-<Signup @success="handleSignup" @close="handleClose" />
+<Signup @switchTo="view = $event" />
 ```
 
 | Event | Payload | Description |
 |---|---|---|
-| `success` | avatar data object | Emitted on successful registration |
-| `close` | — | Emitted when dismissed |
+| `switchTo` | `'login'` | Emitted when the user clicks Sign In |
 
 ---
 
 #### `<AvatarConnect>`
 
-Login/logout toggle chip — manages session state automatically.
+Login/logout toggle chip — fully self-contained. Manages session via `useOasis()` composable. No props or events required.
 
 ```vue
-<AvatarConnect
-  sessionKey="oasis_session"
-  @login="handleLogin"
-  @logout="handleLogout"
-/>
+<AvatarConnect />
 ```
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `sessionKey` | `string` | `'oasis_session'` | sessionStorage key for login state persistence |
-
-| Event | Payload | Description |
-|---|---|---|
-| `login` | `{ avatarId, username, karma }` | Emitted after login |
-| `logout` | — | Emitted after logout |
 
 ---
 
 #### `<ForgotPassword>`
 
 ```vue
-<ForgotPassword @close="handleClose" />
+<ForgotPassword />
 ```
 
 ---
 
 #### `<ResetPassword>`
 
-Password reset form — use with the token from the reset email link.
-
 ```vue
-<ResetPassword :token="tokenFromRoute" @success="handleSuccess" />
+<ResetPassword />
 ```
-
-| Prop | Type | Description |
-|---|---|---|
-| `token` | `string` | **Required.** Reset token from the email link |
 
 ---
 
 #### `<VerifyEmail>`
 
 ```vue
-<VerifyEmail :token="tokenFromRoute" @success="handleSuccess" />
+<VerifyEmail />
 ```
 
 ---
 
 #### `<SearchAvatars>`
 
-```vue
-<SearchAvatars @select="handleSelect" />
-```
-
-| Event | Payload | Description |
-|---|---|---|
-| `select` | avatar object | Emitted when the user picks an avatar |
-
----
-
-#### `<SendInvite>` / `<AcceptInvite>`
+Search the OASIS avatar directory. Controlled via `:open`.
 
 ```vue
-<SendInvite @success="handleSuccess" />
-<AcceptInvite :inviteCode="code" @success="handleSuccess" />
+<SearchAvatars :open="showSearch" @close="showSearch = false" />
 ```
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `open` | `boolean` | `false` | Controls visibility |
+
+| Event | Description |
+|---|---|
+| `close` | Emitted when the panel should close |
 
 ---
 
 ### Avatar
 
-#### `<AvatarProfile>`
+Most avatar popups use `:open` / `@close`:
 
 ```vue
-<AvatarProfile :avatarId="avatarId" @close="handleClose" />
-```
-
-| Prop | Type | Description |
-|---|---|---|
-| `avatarId` | `string` | Avatar to display — defaults to logged-in user |
-
----
-
-#### `<ViewAvatar>`
-
-```vue
-<ViewAvatar :avatarId="avatarId" />
-```
-
----
-
-#### `<EditAvatar>`
-
-```vue
-<EditAvatar @success="handleSuccess" @close="handleClose" />
-```
-
----
-
-#### `<ViewAvatarKarma>`
-
-```vue
-<ViewAvatarKarma :avatarId="avatarId" />
+<ViewAvatar :open="show" @close="show = false" />
+<EditAvatar :open="show" @close="show = false" />
+<AvatarWallet :open="show" @close="show = false" />
 ```
 
 ---
@@ -200,58 +135,20 @@ Password reset form — use with the token from the reset email link.
 
 #### `<KarmaToast>`
 
-Floating karma notification.
+Singleton toast — render once near your app root. Triggered automatically by `useOasis()` when karma changes.
 
 ```vue
-<KarmaToast message="Quest completed" :amount="150" />
+<KarmaToast />
 ```
 
-| Prop | Type | Description |
-|---|---|---|
-| `message` | `string` | Reason text shown below the karma amount |
-| `amount` | `number` | Karma delta — positive shown in cyan, negative in red |
+No props. Driven by internal composable state.
 
 ---
 
 #### `<KarmaPanel>`
 
 ```vue
-<KarmaPanel @close="handleClose" />
-```
-
----
-
-### Map
-
-```vue
-<Map @close="handleClose" />
-```
-
----
-
-### NFT
-
-```vue
-<NFT :nftId="nftId" @close="handleClose" />
-<PurchaseNFT :nftId="nftId" @success="handleSuccess" @close="handleClose" />
-```
-
----
-
-### OApp
-
-```vue
-<CreateOApp @success="handleCreated" @close="handleClose" />
-<LaunchOApp :oappId="oappId" @close="handleClose" />
-```
-
----
-
-### Seeds
-
-```vue
-<Seeds @close="handleClose" />
-<PayWithSeeds :amount="50" :recipientId="recipientId" @success="handleSuccess" @close="handleClose" />
+<KarmaPanel :open="show" @close="show = false" />
 ```
 
 ---
@@ -260,38 +157,37 @@ Floating karma notification.
 
 #### `<OasisModal>`
 
+Controlled via `:open`.
+
 ```vue
-<OasisModal title="My Modal" accentColor="#00c8ff" @close="handleClose">
+<OasisModal :open="isOpen" @close="isOpen = false">
   <p>Modal content goes here.</p>
 </OasisModal>
 ```
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `title` | `string` | `''` | Modal header title |
-| `accentColor` | `string` | `'#00c8ff'` | Header accent colour |
+| `open` | `boolean` | **required** | Controls visibility |
+| `accentColor` | `string` | `'rgba(0,232,124,.25)'` | Border/accent colour |
 
 | Event | Description |
 |---|---|
-| `close` | Emitted when dismissed |
+| `close` | Emitted when the backdrop or close button is clicked |
 
 ---
 
 #### `<NavBar>`
 
 ```vue
-<NavBar :links="[{ label: 'Map', href: '/map' }]" />
+<NavBar />
 ```
 
 ---
 
-#### `<Settings>` / `<Wallet>` / `<StarField>` / `<ComingSoon>`
+#### `<StarField>`
 
 ```vue
-<Settings @close="handleClose" />
-<Wallet @close="handleClose" />
 <StarField />
-<ComingSoon label="Quests" />
 ```
 
 ---
@@ -329,7 +225,7 @@ The OASIS component library ships with the **Dark Space** design system:
 - **Borders**: translucent cyan (`rgba(0,200,255,0.2)`)
 - **Cards**: glassy dark panels with `backdrop-filter: blur`
 
-Override the CSS custom properties to theme components for your own OAPP:
+Override CSS custom properties to theme components for your own OAPP:
 
 ```css
 :root {
